@@ -1,0 +1,15 @@
+.inBlock{
+  display:inline-block;
+}
+
+.alert_message{
+  font-size: 12px;
+}
+
+.hb{
+  margin-bottom:0.5em;
+}
+
+.inline-form{
+    display: inline;
+}

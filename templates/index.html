@@ -1,0 +1,214 @@
+<!doctype html>
+<html>
+<head>
+  <title>Datastore and Firebase Auth Example</title>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://www.gstatic.com/firebasejs/ui/4.4.0/firebase-ui-auth.js"></script>
+  <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/4.4.0/firebase-ui-auth.css" />
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</head>
+<body>
+  <div id="firebase-auth-container"></div>
+  <div id="login-info" class="jumbotron text-center">
+      <h1>File System</h1>
+      <h3>Login Info</h3>
+      {% if user_data %}
+        <dl>
+            <b>Name:</b> {{ user_data['name'] }} </br>
+            <b>Email:</b> {{ user_data['email'] }} </br>
+        </dl>
+      {% elif error_message %}
+        <p>Error Message: {{ error_message }}</p>
+      {% endif %}
+      <button id="sign-out" hidden="true">Sign out</button>
+      <div class="hb"></div>
+      <div class="hb"></div>
+      <p><strong>Current Directory:</strong> {{ current_directory }} </p>
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for message in messages %}
+            <div class="inBlock alert alert-danger alert-dismissible">
+              <div class="alert_message">
+                <a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>
+                <strong>{{ message }}</strong>
+              </div>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      </br>
+
+    </div>
+    <div id="main-page" class="container">
+      <div class="row">
+        <div class="col-md-6">
+          <div class="input-group">
+            <form action="/add_directory" method="post">
+              <div class="input-group-append">
+                <span class="input-group-text" id="inputGroup-sizing-sm"><strong>Add a directory</strong></span>
+                <input type="text" class="form-control" name="add_dir_name" placeholder="Directory name" aria-label="Directory name" aria-describedby="basic-addon2">
+                <button class="btn btn-outline-primary" type="submit">Add</button>
+              </div>
+            </form>
+          </div>
+          <div class="hb"></div>
+          <div class="input-group">
+            <form action="/upload_file" method="post" enctype="multipart/form-data">
+              <div class="input-group-append">
+                <span class="input-group-text" id="inputGroup-sizing-sm"><strong>Upload a file</strong></span>
+                <input id= "upload_file_input" type="file" name="file_name" class="form-control" placeholder="Directory name" aria-label="Directory name" aria-describedby="basic-addon2">
+                <button class="btn btn-outline-primary" type="submit" onclick="return checkOverwrite();">Upload</button>
+              </div>
+            </form>
+          </div>
+          <script>
+          function checkOverwrite() {
+            var files = '{{file_list}}'
+            var file = document.getElementById('upload_file_input').value
+            file = file.split('\\')
+            file_name = file[file.length-1]
+            let split_files = files.split("&gt")
+
+            for (var i = 0; i < split_files.length; i++) {
+                var fix_split = split_files[i].replace(";,", "")
+                var f = fix_split.split(",")[1]
+                f = f.substring(1, f.length)
+                if (file_name === f){
+                    return window.confirm('File already exists. Overwrite?');
+                }
+            }
+          }
+          </script>
+        </div>
+        <div class="col-md-6">
+          <ul class="nav nav-tabs">
+            <li class="nav-item">
+              <a class="nav-link" data-toggle="tab" href="#list_dir">Directories</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" data-toggle="tab" href="#list_files">Files</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" data-toggle="tab" href="#dup_results">Duplicate results</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" data-toggle="tab" href="#shared">Shared with you</a>
+            </li>
+          </ul>
+          <div class="tab-content">
+            <div id="list_dir" class="container tab-pane">
+              <div id="listDir" class="inBlock">
+                <div class="hb"></div>
+                <h5>Directories in current directory</h5>
+                {% for i in directory_list %}
+                  {% if i.name == "../" %}
+                    <a class="btn btn-warning" href="/change_directory/go_up" role="button">{{ i.name }}</a>
+                  {% else %}
+                    <a class="btn btn-primary" href="/change_directory/{{ i.name[0: i.name|length - 1] }}" role="button">{{ i.name }}</a>
+                    {% if i.name != "/" %}
+                      <form class="inline-form" action="/remove_directory/{{ i.name[0: i.name|length - 1]}}" method="post">
+                        <button class="btn btn-danger" type="submit">Delete</button>
+                      </form>
+                    {% endif %}
+                  {% endif %}
+                  <div class="hb"></div>
+                {% endfor %}
+              </div>
+            </div>
+            <div id="list_files" class="container tab-pane">
+              <div id="listFiles">
+                <div class="hb"></div>
+                <h5>Files in current directory</h5>
+                {% for i in file_list %}
+                  <div class="input-group input-group-sm md-6">
+                    <form action="/download_file/{{ i.name }}" method="post">
+                      <div class="input-group input-group-sm mb-3">
+                        <div class="input-group-prepend">
+                          <span class="input-group-text" id="inputGroup-sizing-sm"><strong>{{ i.name }}</strong></span>
+                        </div>
+                        <button class="btn btn-primary btn-sm" type="submit">Download</button>
+                      </div>
+                    </form>
+                    <form action="/remove_file/{{ i.name }}" method="post">
+                      <button class="btn btn-danger btn-sm" type="submit">Delete</button>
+                    </form>
+                    <form action="/check_duplicates={{ i.name }}" method="post">
+                      <div class="input-group input-group-sm mb-3">
+                        <input class="btn btn-secondary btn-sm" type="submit" name="check_dup_button" value="Check Duplicates">
+                        <div class="custom-control custom-switch">
+                          <input type="checkbox" class="custom-control-input" id="switch1" name="boxer">
+                          <label class="custom-control-label" for="switch1" data-toggle="tooltip" title="Toggle on to check duplicates in the entire dropbox"></label>
+                        </div>
+                      </div>
+                    </form>
+                    <form action="/share_file={{ i.name }}" method="post">
+                      <div class="input-group input-group-sm mb-3">
+                        <input type="email" class="form-control" name="share_email" placeholder="Other user's email" aria-label="Email" aria-describedby="emailHelp">
+                        <div class="input-group-append">
+                          <input class="btn btn-success btn-sm" type="submit" name="share_button" value="Share">
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+            <script>
+            $(document).ready(function(){
+              $('[data-toggle="tooltip"]').tooltip();
+            });
+            </script>
+            <div id="dup_results" class="container tab-pane">
+              <div id="dupRes" class="inBlock">
+                <div class="hb"></div>
+                <h5>Duplicates</h5>
+                <div class="list-group">
+                  {% for i in duplicate_files %}
+                    <a href="#" class="list-group-item list-group-item-action">{{i.name}}</a>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            <div id="shared" class="container tab-pane">
+              <div id="sharedFil" class="inBlock">
+                <div class="hb"></div>
+                <table class="table table-hover">
+                  <caption>List of shared files</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">File name</th>
+                      <th scope="col">Shared by</th>
+                      <th scope="col">Download</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for i in shared_files %}
+                      <tr>
+                        <td>{{i.name}}</td>
+                        <td>{{i.email}}</td>
+                        <td>
+                          <form action="/download_shared_file/{{ i.name }}" method="post">
+                            <input type="text" name="sharer_email_hidden" value="{{i.email}}" hidden/>
+                            <input class="btn btn-primary btn-sm" type="Submit" value="Download"/>
+                          </form>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+  </div>
+  <script src="https://www.gstatic.com/firebasejs/7.14.5/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/7.8.0/firebase-auth.js"></script>
+  <script src="{{ url_for('static', filename='app-setup.js') }}"></script>
+
+</body>
+</html>
